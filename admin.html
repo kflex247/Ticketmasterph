@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticketmaster Admin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            background-color: #111;
+            color: #fff;
+            font-family: sans-serif;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        th {
+            border-bottom: 2px solid #333;
+            padding: 10px;
+        }
+        td {
+            border-bottom: 1px solid #222;
+            padding: 10px;
+        }
+        .status-badge {
+            background-color: #333;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .btn-approve { background-color: #22c55e; color: #fff; }
+        .btn-reject { background-color: #ef4444; color: #fff; }
+    </style>
+</head>
+<body>
+
+    <h1>Admin Orders Dashboard</h1>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Order ID</th>
+                <th>Customer Name</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="orders-table-body">
+            <tr>
+                <td colspan="4" style="padding: 20px; text-align: center;">Loading orders from database...</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        // Use the credentials from your app.js to initialize supabase here if needed,
+        // or it will read from the global window scope if loaded sequentially.
+        const SUPABASE_URL = "YOUR_SUPABASE_URL"; 
+        const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY";
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // 1. Fetch live orders from Supabase
+        async function loadOrders() {
+            const tableBody = document.getElementById('orders-table-body');
+            
+            const { data: orders, error } = await supabase
+                .from('orders')
+                .select('*');
+
+            if (error) {
+                console.error('Error fetching orders:', error);
+                tableBody.innerHTML = `<tr><td colspan="4" style="color: #ef4444;">Failed to load data.</td></tr>`;
+                return;
+            }
+
+            if (!orders || orders.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;">No orders found.</td></tr>`;
+                return;
+            }
+
+            // Clear loading text and populate data rows
+            tableBody.innerHTML = '';
+            orders.forEach(order => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${order.id}</td>
+                    <td>${order.customer_name || 'Anonymous User'}</td>
+                    <td><span class="status-badge">${order.status}</span></td>
+                    <td>
+                        <button class="btn-approve" onclick="approveOrder('${order.id}')">Approve</button>
+                        <button class="btn-reject" onclick="rejectOrder('${order.id}')">Reject</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // 2. Live Action: Approve Order
+        async function approveOrder(orderId) {
+            const { error } = await supabase
+                .from('orders')
+                .update({
+                    status: 'approved',
+                    approved_at: new Date().toISOString()
+                })
+                .eq('id', orderId);
+
+            if (error) {
+                alert('Error approving order: ' + error.message);
+            } else {
+                alert('Order approved successfully!');
+                loadOrders(); // Refresh screen view
+            }
+        }
+
+        // 3. Live Action: Reject Order
+        async function rejectOrder(orderId) {
+            const { error } = await supabase
+                .from('orders')
+                .update({
+                    status: 'rejected',
+                    rejected_at: new Date().toISOString()
+                })
+                .eq('id', orderId);
+
+            if (error) {
+                alert('Error rejecting order: ' + error.message);
+            } else {
+                alert('Order rejected.');
+                loadOrders(); // Refresh screen view
+            }
+        }
+
+        // Initialize dashboard data on entry
+        loadOrders();
+    </script>
+</body>
+</html>
+
