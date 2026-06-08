@@ -1,3 +1,54 @@
+// Function to handle image upload to Supabase Storage and link it to the order
+async function handleUploadPaymentProof(orderId, fileInputInput) {
+    const file = fileInputInput.files[0];
+    if (!file) {
+        alert("Please select a receipt image file to upload.");
+        return;
+    }
+
+    try {
+        // 1. Generate a unique filename path inside the bucket
+        const fileExtension = file.name.split('.').pop();
+        const filePath = `${orderId}-${Date.now()}.${fileExtension}`;
+
+        // 2. Upload the raw image binary into the payment-proofs storage bucket
+        const { data: storageData, error: storageError } = await supabase
+            .storage
+            .from('payment-proofs')
+            .upload(filePath, file);
+
+        if (storageError) throw storageError;
+
+        // 3. Retrieve the public URL string for the newly uploaded graphic asset
+        const { data: urlData } = supabase
+            .storage
+            .from('payment-proofs')
+            .getPublicUrl(filePath);
+
+        const publicProofUrl = urlData.publicUrl;
+
+        // 4. Update the customer's order row in the database with the image link
+        const { error: dbError } = await supabase
+            .from('orders')
+            .update({
+                payment_proof_url: publicProofUrl,
+                status: 'proof_uploaded'
+            })
+            .eq('order_id', orderId);
+
+        if (dbError) throw dbError;
+
+        alert("Payment proof uploaded successfully! Our team will verify your transaction.");
+        
+        // Hide upload modal if applicable
+        const uploadModal = document.getElementById('upload-modal');
+        if (uploadModal) uploadModal.style.display = 'none';
+
+    } catch (err) {
+        console.error("Error running priority 3 proof upload asset flow:", err);
+        alert("Upload failed: " + err.message);
+    }
+}
 // Function triggered when the user clicks 'Make Payment'
 async function handleCreateOrder(event) {
     if (event) event.preventDefault();
