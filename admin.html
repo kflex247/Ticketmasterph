@@ -1,3 +1,4 @@
+nano admin.html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,45 +7,17 @@
     <title>Ticketmaster Admin Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body {
-            background-color: #111;
-            color: #fff;
-            font-family: sans-serif;
-            padding: 20px;
-        }
-        h1 {
-            font-size: 24px;
-            margin-bottom: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-        }
-        th {
-            border-bottom: 2px solid #333;
-            padding: 10px;
-        }
-        td {
-            border-bottom: 1px solid #222;
-            padding: 10px;
-        }
-        .status-badge {
-            background-color: #333;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        button {
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            margin-right: 5px;
-        }
+        body { background-color: #111; color: #fff; font-family: sans-serif; padding: 20px; }
+        h1 { font-size: 24px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { border-bottom: 2px solid #333; padding: 10px; }
+        td { border-bottom: 1px solid #222; padding: 10px; }
+        .status-badge { background-color: #333; padding: 4px 8px; border-radius: 4px; font-size: 14px; }
+        button { border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 5px; }
         .btn-approve { background-color: #22c55e; color: #fff; }
         .btn-reject { background-color: #ef4444; color: #fff; }
+        .link-proof { color: #38bdf8; text-decoration: none; font-weight: bold; }
+        .link-proof:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -57,49 +30,56 @@
                 <th>Order ID</th>
                 <th>Customer Name</th>
                 <th>Status</th>
+                <th>Payment Proof</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody id="orders-table-body">
             <tr>
-                <td colspan="4" style="padding: 20px; text-align: center;">Loading orders from database...</td>
+                <td colspan="5" style="padding: 20px; text-align: center;">Loading orders...</td>
             </tr>
         </tbody>
     </table>
 
     <script>
-        // Real active project configuration keys securely injected here
         const SUPABASE_URL = "https://tuwitgjfdcgllxafnrpw.supabase.co";
         const SUPABASE_KEY = "sb_publishable_RnHIZIH_tXIs4d5QA4QOvg_XS7ylcOH";
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // 1. Fetch live orders from Supabase
+        // Fetch and display rows
         async function loadOrders() {
             const tableBody = document.getElementById('orders-table-body');
             
             const { data: orders, error } = await supabase
                 .from('orders')
-                .select('*');
+                .select('*')
+                .order('created_at', { ascending: false });
 
             if (error) {
                 console.error('Error fetching orders:', error);
-                tableBody.innerHTML = `<tr><td colspan="4" style="color: #ef4444;">Failed to load data.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="5" style="color: #ef4444;">Failed to load data.</td></tr>`;
                 return;
             }
 
             if (!orders || orders.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;">No orders found.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">No orders found.</td></tr>`;
                 return;
             }
 
-            // Clear loading text and populate data rows
             tableBody.innerHTML = '';
             orders.forEach(order => {
                 const row = document.createElement('tr');
+                
+                // Priority 4: Render View Proof hyperlink if an asset string exists
+                const proofCell = order.payment_proof_url 
+                    ? `<a class="link-proof" href="${order.payment_proof_url}" target="_blank">View Proof</a>`
+                    : `<span style="color:#666;">None</span>`;
+
                 row.innerHTML = `
-                    <td>${order.id}</td>
-                    <td>${order.customer_name || 'Anonymous User'}</td>
+                    <td>${order.order_id || order.id}</td>
+                    <td>${order.customer_name || 'Anonymous'}</td>
                     <td><span class="status-badge">${order.status}</span></td>
+                    <td>${proofCell}</td>
                     <td>
                         <button class="btn-approve" onclick="approveOrder('${order.id}')">Approve</button>
                         <button class="btn-reject" onclick="rejectOrder('${order.id}')">Reject</button>
@@ -109,45 +89,80 @@
             });
         }
 
-        // 2. Live Action: Approve Order
-        async function approveOrder(orderId) {
+        // Priority 5: Exact State update matching instruction rules
+        async function approveOrder(id) {
             const { error } = await supabase
                 .from('orders')
                 .update({
                     status: 'approved',
                     approved_at: new Date().toISOString()
                 })
-                .eq('id', orderId);
+                .eq('id', id);
 
             if (error) {
-                alert('Error approving order: ' + error.message);
+                alert('Approval failed: ' + error.message);
             } else {
                 alert('Order approved successfully!');
-                loadOrders(); // Refresh screen view
+                loadOrders(); 
             }
         }
 
-        // 3. Live Action: Reject Order
-        async function rejectOrder(orderId) {
+        async function rejectOrder(id) {
             const { error } = await supabase
                 .from('orders')
                 .update({
-                    status: 'rejected',
-                    rejected_at: new Date().toISOString()
+                    status: 'rejected'
                 })
-                .eq('id', orderId);
+                .eq('id', id);
 
             if (error) {
-                alert('Error rejecting order: ' + error.message);
+                alert('Rejection failed: ' + error.message);
             } else {
-                alert('Order rejected.');
-                loadOrders(); // Refresh screen view
+                alert('Order marked as rejected.');
+                loadOrders();
             }
         }
 
-        // Initialize dashboard data on entry
+        // Initialize display
         loadOrders();
     </script>
 </body>
 </html>
+// Lightweight CDN option for Client-Side QR Codes inside admin.html
+// Paste this inside your script block to allow instant image formatting
+function displayGeneratedQR(orderIdString) {
+    const qrContainerUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${orderIdString}`;
+    console.log("Generated Ticket QR Asset Pointer URL:", qrContainerUrl);
+    // You can use this URL to send to users or print on a modal ticket view
+    return qrContainerUrl;
+}
+<div class="seat-selection-container" style="padding: 15px; background: #222; border-radius: 8px; margin-top: 15px;">
+    <h3>Select Your Section Location</h3>
+    <select id="seat-map-selector" style="width: 100%; padding: 10px; background: #333; color: #fff; border: 1px solid #444;">
+        <option value="Bleachers 1 Left">Bleachers 1 Left</option>
+        <option value="Bleachers 1 Right">Bleachers 1 Right</option>
+        <option value="VIP Center Row A">VIP Center Row A</option>
+        <option value="Main Floor General">Main Floor General Admission</option>
+    </select>
+</div>
+const selectedSeatMap = document.getElementById('seat-map-selector')?.value || 'Bleachers 1 Left';
+
+nano admin.html
+// Priority 9: Establish live pipeline socket channel subscription
+const ordersChannel = supabase
+    .channel('orders-realtime-channel')
+    .on(
+        'postgres_changes',
+        {
+            event: '*',
+            schema: 'public',
+            table: 'orders'
+        },
+        (payload) => {
+            console.log('Realtime database action caught successfully:', payload);
+            // Re-trigger visual updates automatically when rows are inserted or uploaded
+            loadOrders(); 
+        }
+    )
+    .subscribe();
 
