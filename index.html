@@ -1,0 +1,446 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+const SUPABASE_URL = "https://your-project.supabase.co";
+const SUPABASE_ANON_KEY = "your-anon-key";
+
+const EVENTS = [
+  { id: 1, date: "March 13, 2027", day: "Sabado", doors: "16:00", show: "19:00" },
+  { id: 2, date: "March 14, 2027", day: "Linggo", doors: "16:00", show: "19:00" },
+];
+
+const TICKETS = [
+  {
+    id: "vip",
+    tier: "VIP Soundcheck",
+    emoji: "💜",
+    price: 20000,
+    color: "#9333ea",
+    glow: "rgba(147,51,234,0.6)",
+    gradient: "from-purple-900 via-purple-700 to-purple-500",
+    border: "border-purple-500",
+    available: 150,
+    perks: ["Floor Standing access", "Pre-show soundcheck party", "VIP laminate & lanyard", "Early entry & merch access", "Exclusive VIP gift item"],
+  },
+  {
+    id: "floor",
+    tier: "Floor Standing",
+    emoji: "💛",
+    price: 15000,
+    color: "#eab308",
+    glow: "rgba(234,179,8,0.6)",
+    gradient: "from-yellow-900 via-yellow-700 to-yellow-500",
+    border: "border-yellow-500",
+    available: 800,
+    perks: ["Closest standing area to stage", "Premium sound zone", "Festival wristband"],
+  },
+  {
+    id: "b1",
+    tier: "Bleachers 1",
+    emoji: "💙",
+    price: 9500,
+    color: "#3b82f6",
+    glow: "rgba(59,130,246,0.6)",
+    gradient: "from-blue-900 via-blue-700 to-blue-500",
+    border: "border-blue-500",
+    available: 1200,
+    perks: ["Mid-tier elevated seating", "Great overall stage view", "Comfortable seats"],
+  },
+  {
+    id: "b2",
+    tier: "Bleachers 2",
+    emoji: "💚",
+    price: 5500,
+    color: "#22c55e",
+    glow: "rgba(34,197,94,0.6)",
+    gradient: "from-green-900 via-green-700 to-green-500",
+    border: "border-green-500",
+    available: 2000,
+    perks: ["Budget-friendly option", "Full stage view", "Festival atmosphere"],
+  },
+];
+
+const LANGS = { en: "English", fil: "Filipino", ko: "한국어", pt: "Português", es: "Español", fr: "Français" };
+
+const T = {
+  en: {
+    nav_home: "Home", nav_events: "Events", nav_tickets: "Tickets", nav_about: "About", nav_faq: "FAQ", nav_contact: "Contact",
+    hero_sub: "WORLD TOUR · PHILIPPINES 2026",
+    hero_title: "BTS WORLD TOUR", hero_title2: "ARIRANG",
+    hero_venue: "Philippine Sports Stadium · March 2027 · 3 Exclusive Shows",
+    hero_cta: "Buy Tickets", hero_cta2: "View Events",
+    countdown_label: "Until the Show Begins",
+    days: "Days", hours: "Hours", mins: "Minutes", secs: "Seconds",
+    events_title: "Concert Dates", events_sub: "Choose your night — two unforgettable shows await",
+    tickets_title: "Select Your Tickets",
+    tickets_sub: "Choose your tier and secure your spot",
+    available: "Available",
+    select: "Select",
+    qty: "Quantity",
+    total: "Total",
+    checkout: "Proceed to Checkout",
+    checkout_title: "Complete Your Order",
+    name: "Full Name", email: "Email Address", phone: "Phone Number",
+    country: "Country", currency: "Currency",
+    payment_method: "Payment Method",
+    make_payment: "Make Payment",
+    order_summary: "Order Summary",
+    processing: "Processing…",
+    success_title: "Order Submitted!",
+    success_msg: "Your purchase request has been received. Our support team will contact you shortly via chat to complete your payment.",
+    faq_title: "Frequently Asked Questions",
+    footer_rights: "© 2026 Ticketmaster · World Tour Arirang Philippines. All rights reserved.",
+    login: "Login", signup: "Sign Up", logout: "Logout", dashboard: "Dashboard",
+    about_title: "About the Tour",
+    contact_title: "Contact Us",
+    testimonials_title: "What Fans Say",
+  },
+  fil: {
+    nav_home: "Tahanan", nav_events: "Mga Event", nav_tickets: "Mga Tiket", nav_about: "Tungkol", nav_faq: "FAQ", nav_contact: "Makipag-ugnayan",
+    hero_sub: "WORLD TOUR · PILIPINAS 2026",
+    hero_title: "BTS WORLD TOUR", hero_title2: "ARIRANG",
+    hero_venue: "Philippine Sports Stadium · Marso 2027 · 3 Eksklusibong Palabas",
+    hero_cta: "Bumili ng Tiket", hero_cta2: "Tingnan ang mga Event",
+    countdown_label: "Hanggang sa Simula ng Palabas",
+    days: "Araw", hours: "Oras", mins: "Minuto", secs: "Segundo",
+    events_title: "Mga Petsa ng Konsyerto", events_sub: "Piliin ang iyong gabi — dalawang hindi malilimutang palabas ang naghihintay",
+    tickets_title: "Pumili ng Tiket",
+    tickets_sub: "Piliin ang iyong kategorya at i-secure ang iyong lugar",
+    available: "Magagamit",
+    select: "Pumili",
+    qty: "Dami",
+    total: "Kabuuan",
+    checkout: "Magpatuloy sa Checkout",
+    checkout_title: "Kumpletuhin ang Iyong Order",
+    name: "Buong Pangalan", email: "Email Address", phone: "Numero ng Telepono",
+    country: "Bansa", currency: "Pera",
+    payment_method: "Paraan ng Bayad",
+    make_payment: "Magbayad",
+    order_summary: "Buod ng Order",
+    processing: "Pinoproseso…",
+    success_title: "Naisumite ang Order!",
+    success_msg: "Natanggap na ang iyong kahilingan sa pagbili. Makikipag-ugnayan sa iyo ang aming support team sa pamamagitan ng chat upang makumpleto ang iyong bayad.",
+    faq_title: "Mga Madalas na Itanong",
+    footer_rights: "© 2026 Ticketmaster · World Tour Arirang Pilipinas. Lahat ng karapatan ay nakalaan.",
+    login: "Mag-login", signup: "Mag-sign up", logout: "Mag-logout", dashboard: "Dashboard",
+    about_title: "Tungkol sa Tour",
+    contact_title: "Makipag-ugnayan",
+    testimonials_title: "Sinasabi ng mga Tagahanga",
+  },
+  ko: {
+    nav_home: "홈", nav_events: "이벤트", nav_tickets: "티켓", nav_about: "소개", nav_faq: "FAQ", nav_contact: "문의",
+    hero_sub: "월드투어 · 필리핀 2026",
+    hero_title: "BTS 월드투어", hero_title2: "아리랑",
+    hero_venue: "필리핀 스포츠 스타디움 · 2027년 3월 · 3회 독점 공연",
+    hero_cta: "티켓 구매", hero_cta2: "이벤트 보기",
+    countdown_label: "공연 시작까지",
+    days: "일", hours: "시간", mins: "분", secs: "초",
+    events_title: "콘서트 날짜", events_sub: "당신의 밤을 선택하세요 — 두 번의 잊지 못할 공연",
+    tickets_title: "티켓 선택",
+    tickets_sub: "등급을 선택하고 자리를 확보하세요",
+    available: "이용 가능",
+    select: "선택",
+    qty: "수량",
+    total: "합계",
+    checkout: "결제하기",
+    checkout_title: "주문 완료",
+    name: "성명", email: "이메일 주소", phone: "전화번호",
+    country: "국가", currency: "통화",
+    payment_method: "결제 방법",
+    make_payment: "결제하기",
+    order_summary: "주문 요약",
+    processing: "처리 중…",
+    success_title: "주문이 제출되었습니다!",
+    success_msg: "구매 요청이 접수되었습니다. 결제를 완료하기 위해 곧 채팅을 통해 연락드리겠습니다.",
+    faq_title: "자주 묻는 질문",
+    footer_rights: "© 2026 Ticketmaster · 월드투어 아리랑 필리핀. 모든 권리 보유.",
+    login: "로그인", signup: "회원가입", logout: "로그아웃", dashboard: "대시보드",
+    about_title: "투어 소개",
+    contact_title: "문의하기",
+    testimonials_title: "팬들의 이야기",
+  },
+  pt: {
+    nav_home: "Início", nav_events: "Eventos", nav_tickets: "Ingressos", nav_about: "Sobre", nav_faq: "FAQ", nav_contact: "Contato",
+    hero_sub: "TURNÊ MUNDIAL · FILIPINAS 2026",
+    hero_title: "BTS WORLD TOUR", hero_title2: "ARIRANG",
+    hero_venue: "Philippine Sports Stadium · Março 2027 · 3 Shows Exclusivos",
+    hero_cta: "Comprar Ingressos", hero_cta2: "Ver Eventos",
+    countdown_label: "Até o Início do Show",
+    days: "Dias", hours: "Horas", mins: "Minutos", secs: "Segundos",
+    events_title: "Datas do Concerto", events_sub: "Escolha sua noite — duas noites inesquecíveis esperam por você",
+    tickets_title: "Selecione seus Ingressos",
+    tickets_sub: "Escolha sua categoria e garanta seu lugar",
+    available: "Disponível",
+    select: "Selecionar",
+    qty: "Quantidade",
+    total: "Total",
+    checkout: "Prosseguir para o Checkout",
+    checkout_title: "Finalizar Pedido",
+    name: "Nome Completo", email: "Endereço de Email", phone: "Número de Telefone",
+    country: "País", currency: "Moeda",
+    payment_method: "Forma de Pagamento",
+    make_payment: "Efetuar Pagamento",
+    order_summary: "Resumo do Pedido",
+    processing: "Processando…",
+    success_title: "Pedido Enviado!",
+    success_msg: "Sua solicitação de compra foi recebida. Nossa equipe de suporte entrará em contato em breve pelo chat para concluir seu pagamento.",
+    faq_title: "Perguntas Frequentes",
+    footer_rights: "© 2026 Ticketmaster · World Tour Arirang Filipinas. Todos os direitos reservados.",
+    login: "Entrar", signup: "Cadastrar", logout: "Sair", dashboard: "Painel",
+    about_title: "Sobre a Turnê",
+    contact_title: "Contato",
+    testimonials_title: "O que os Fãs Dizem",
+  },
+  es: {
+    nav_home: "Inicio", nav_events: "Eventos", nav_tickets: "Entradas", nav_about: "Sobre", nav_faq: "FAQ", nav_contact: "Contacto",
+    hero_sub: "GIRA MUNDIAL · FILIPINAS 2026",
+    hero_title: "BTS WORLD TOUR", hero_title2: "ARIRANG",
+    hero_venue: "Philippine Sports Stadium · Marzo 2027 · 3 Shows Exclusivos",
+    hero_cta: "Comprar Entradas", hero_cta2: "Ver Eventos",
+    countdown_label: "Hasta que Comience el Show",
+    days: "Días", hours: "Horas", mins: "Minutos", secs: "Segundos",
+    events_title: "Fechas del Concierto", events_sub: "Elige tu noche — dos noches inolvidables te esperan",
+    tickets_title: "Selecciona tus Entradas",
+    tickets_sub: "Elige tu categoría y asegura tu lugar",
+    available: "Disponible",
+    select: "Seleccionar",
+    qty: "Cantidad",
+    total: "Total",
+    checkout: "Proceder al Pago",
+    checkout_title: "Completar Pedido",
+    name: "Nombre Completo", email: "Correo Electrónico", phone: "Número de Teléfono",
+    country: "País", currency: "Moneda",
+    payment_method: "Método de Pago",
+    make_payment: "Realizar Pago",
+    order_summary: "Resumen del Pedido",
+    processing: "Procesando…",
+    success_title: "¡Pedido Enviado!",
+    success_msg: "Tu solicitud de compra ha sido recibida. Nuestro equipo de soporte se pondrá en contacto contigo pronto por chat para completar tu pago.",
+    faq_title: "Preguntas Frecuentes",
+    footer_rights: "© 2026 Ticketmaster · World Tour Arirang Filipinas. Todos los derechos reservados.",
+    login: "Iniciar Sesión", signup: "Registrarse", logout: "Cerrar Sesión", dashboard: "Panel",
+    about_title: "Sobre la Gira",
+    contact_title: "Contacto",
+    testimonials_title: "Lo que Dicen los Fans",
+  },
+  fr: {
+    nav_home: "Accueil", nav_events: "Événements", nav_tickets: "Billets", nav_about: "À propos", nav_faq: "FAQ", nav_contact: "Contact",
+    hero_sub: "TOURNÉE MONDIALE · PHILIPPINES 2026",
+    hero_title: "BTS WORLD TOUR", hero_title2: "ARIRANG",
+    hero_venue: "Philippine Sports Stadium · Mars 2027 · 3 Spectacles Exclusifs",
+    hero_cta: "Acheter des Billets", hero_cta2: "Voir les Événements",
+    countdown_label: "Avant le Début du Spectacle",
+    days: "Jours", hours: "Heures", mins: "Minutes", secs: "Secondes",
+    events_title: "Dates du Concert", events_sub: "Choisissez votre nuit — deux soirées inoubliables vous attendent",
+    tickets_title: "Sélectionnez vos Billets",
+    tickets_sub: "Choisissez votre catégorie et sécurisez votre place",
+    available: "Disponible",
+    select: "Sélectionner",
+    qty: "Quantité",
+    total: "Total",
+    checkout: "Passer à la Caisse",
+    checkout_title: "Finaliser la Commande",
+    name: "Nom Complet", email: "Adresse Email", phone: "Numéro de Téléphone",
+    country: "Pays", currency: "Devise",
+    payment_method: "Mode de Paiement",
+    make_payment: "Effectuer le Paiement",
+    order_summary: "Résumé de la Commande",
+    processing: "Traitement…",
+    success_title: "Commande Soumise!",
+    success_msg: "Votre demande d'achat a été reçue. Notre équipe de support vous contactera bientôt par chat pour finaliser votre paiement.",
+    faq_title: "Questions Fréquemment Posées",
+    footer_rights: "© 2026 Ticketmaster · World Tour Arirang Philippines. Tous droits réservés.",
+    login: "Connexion", signup: "S'inscrire", logout: "Déconnexion", dashboard: "Tableau de bord",
+    about_title: "À propos de la Tournée",
+    contact_title: "Nous Contacter",
+    testimonials_title: "Ce que Disent les Fans",
+  },
+};
+
+const FAQS = [
+  { q: "When do the gates open?", a: "Gates open at 16:00 (4:00 PM). We recommend arriving early to beat the queues." },
+  { q: "How do I receive my ticket?", a: "After payment confirmation, you will receive a PDF ticket with a unique QR code via email." },
+  { q: "Are tickets refundable?", a: "All sales are final. No refunds or exchanges unless the event is cancelled." },
+  { q: "What is included in VIP Soundcheck?", a: "VIP Soundcheck includes Floor Standing access, pre-show soundcheck party, VIP laminate & lanyard, early entry, early merchandise access, and an exclusive VIP gift item." },
+  { q: "What currencies are accepted?", a: "We accept PHP (Philippine Peso), USD (US Dollar), EUR (Euro), BRL (Brazilian Real), KRW (Korean Won)." },
+  { q: "Is re-entry allowed?", a: "No re-entry is permitted once you exit the venue." },
+];
+
+const TESTIMONIALS = [
+  { name: "Maria Santos", country: "Philippines 🇵🇭", text: "Hindi ko malilimutan ang gabing ito. BTS sa Philippines — pangarap ko talaga ito!", avatar: "MS", stars: 5 },
+  { name: "Ji-Eun Park", country: "South Korea 🇰🇷", text: "전 세계에서 BTS 콘서트를 봤지만, 필리핀 공연은 최고였어요!", avatar: "JP", stars: 5 },
+  { name: "Ana Lima", country: "Brazil 🇧🇷", text: "Viajei do Brasil só para ver o BTS! Valeu cada centavo, experiência incrível!", avatar: "AL", stars: 5 },
+  { name: "Sophie Martin", country: "France 🇫🇷", text: "J'ai traversé le monde pour assister à ce concert. Une expérience magique et inoubliable!", avatar: "SM", stars: 5 },
+  { name: "Carlos García", country: "Spain 🇪🇸", text: "¡Increíble! El estadio entero cantando en coro, fue la noche de mi vida.", avatar: "CG", stars: 5 },
+];
+
+const CURRENCIES = {
+  PHP: { symbol: "₱", rate: 1 },
+  USD: { symbol: "$", rate: 0.017 },
+  EUR: { symbol: "€", rate: 0.016 },
+  BRL: { symbol: "R$", rate: 0.09 },
+  KRW: { symbol: "₩", rate: 22.8 },
+};
+
+function formatPrice(php, currency) {
+  const c = CURRENCIES[currency] || CURRENCIES.PHP;
+  const val = (php * c.rate).toLocaleString("en-US", { maximumFractionDigits: 0 });
+  return `${c.symbol}${val}`;
+}
+
+function generateQRData(ticketId) {
+  return `ARIRANG2027-${ticketId}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+}
+
+function QRCode({ data, size = 80 }) {
+  const modules = 21;
+  const cellSize = size / modules;
+  const hash = data.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const cells = Array.from({ length: modules }, (_, r) =>
+    Array.from({ length: modules }, (_, c) => {
+      if (r < 7 && c < 7) return true;
+      if (r < 7 && c >= modules - 7) return true;
+      if (r >= modules - 7 && c < 7) return true;
+      return ((hash * (r + 1) * (c + 1)) % 3) === 0;
+    })
+  );
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ background: "white" }}>
+      {cells.map((row, r) =>
+        row.map((on, c) =>
+          on ? <rect key={`${r}-${c}`} x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill="#0a0a0a" /> : null
+        )
+      )}
+    </svg>
+  );
+}
+
+// ── Particle Background ───────────────────────────────────────────────────────
+function ParticleField() {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const particles = Array.from({ length: 120 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 2 + 0.5,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      color: ["#9333ea", "#3b82f6", "#eab308", "#a855f7"][Math.floor(Math.random() * 4)],
+      alpha: Math.random() * 0.8 + 0.2,
+    }));
+    let anim;
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach((p) => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = p.color + Math.floor(p.alpha * 255).toString(16).padStart(2, "0");
+        ctx.fill();
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+      });
+      anim = requestAnimationFrame(draw);
+    }
+    draw();
+    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    window.addEventListener("resize", resize);
+    return () => { cancelAnimationFrame(anim); window.removeEventListener("resize", resize); };
+  }, []);
+  return <canvas ref={canvasRef} style={{ position: "fixed", top: 0, left: 0, pointerEvents: "none", zIndex: 0, opacity: 0.4 }} />;
+}
+
+// ── Countdown ─────────────────────────────────────────────────────────────────
+function useCountdown(target) {
+  const [time, setTime] = useState({ d: 0, h: 0, m: 0, s: 0 });
+  useEffect(() => {
+    function tick() {
+      const diff = new Date(target) - new Date();
+      if (diff <= 0) { setTime({ d: 0, h: 0, m: 0, s: 0 }); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setTime({ d, h, m, s });
+    }
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [target]);
+  return time;
+}
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+export default function App() {
+  const [lang, setLang] = useState("fil");
+  const [currency, setCurrency] = useState("PHP");
+  const [page, setPage] = useState("home");
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [cart, setCart] = useState({});
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [user, setUser] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
+  const [authForm, setAuthForm] = useState({ email: "", password: "", name: "" });
+  const [checkoutForm, setCheckoutForm] = useState({ name: "", email: "", phone: "", country: "Philippines", currency: "PHP", payment: "gcash" });
+  const [processing, setProcessing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [testimonialIdx, setTestimonialIdx] = useState(0);
+  const [navScrolled, setNavScrolled] = useState(false);
+  const countdown = useCountdown("2027-03-13T16:00:00+08:00");
+  const t = T[lang] || T.en;
+
+  useEffect(() => {
+    const onScroll = () => setNavScrolled(window.scrollY > 60);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    // Inject Tawk.to
+    if (!window.Tawk_API) {
+      const s1 = document.createElement("script");
+      s1.async = true;
+      s1.src = "https://embed.tawk.to/6a25e4911aa22f1c2d3c2e94/default";
+      s1.charset = "UTF-8";
+      s1.setAttribute("crossorigin", "*");
+      document.head.appendChild(s1);
+    }
+  }, []);
+
+  const cartTotal = Object.entries(cart).reduce((sum, [id, qty]) => {
+    const t2 = TICKETS.find((t3) => t3.id === id);
+    return sum + (t2 ? t2.price * qty : 0);
+  }, 0);
+
+  const cartItems = Object.entries(cart).filter(([, q]) => q > 0).map(([id, qty]) => {
+    const tk = TICKETS.find((t3) => t3.id === id);
+    return { ...tk, qty };
+  });
+
+  async function handlePayment() {
+    if (!checkoutForm.name || !checkoutForm.email || !checkoutForm.phone) return alert("Pakikumpleto ang lahat ng field / Please fill all fields.");
+    setProcessing(true);
+    await new Promise((r) => setTimeout(r, 1500));
+    const purchaseId = "ARG-" + Date.now();
+    const summary = {
+      purchase_id: purchaseId,
+      customer: checkoutForm,
+      event: selectedEvent || EVENTS[0],
+      tickets: cartItems,
+      total_php: cartTotal,
+      total_display: formatPrice(cartTotal, currency),
+      currency,
+      timestamp: new Date().toISOString(),
+    };
+    console.log("Purchase Request:", summary);
+    if (window.Tawk_API) {
+      try {
+  
