@@ -68,11 +68,10 @@
     </table>
 
     <script>
-        // Use the credentials from your app.js to initialize supabase here if needed,
-        // or it will read from the global window scope if loaded sequentially.
-        const SUPABASE_URL = "YOUR_SUPABASE_URL"; 
-        const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY";
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // Real active project configuration keys securely injected here
+        const SUPABASE_URL = "https://tuwitgjfdcgllxafnrpw.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_RnHIZIH_tXIs4d5QA4QOvg_XS7ylcOH";
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // 1. Fetch live orders from Supabase
         async function loadOrders() {
